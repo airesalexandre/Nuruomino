@@ -2,17 +2,19 @@
 # Devem alterar as classes e funções neste ficheiro de acordo com as instruções do enunciado.
 # Além das funções e classes sugeridas, podem acrescentar outras que considerem pertinentes.
 
-# Grupo 00:
-# 00000 Nome1
-# 00000 Nome2
+# Grupo 50:
+# 110421 Alexandre Aires
+# 109416 Pedro Veríssimo
+
+from search import Problem, Node
 
 class NuruominoState:
     state_id = 0
 
     def __init__(self, board):
         self.board = board
-        self.id = Nuroumino.state_id
-        Nuroumino.state_id += 1
+        self.id = NuruominoState.state_id
+        NuruominoState.state_id += 1
 
     def __lt__(self, other):
         """ Este método é utilizado em caso de empate na gestão da lista
