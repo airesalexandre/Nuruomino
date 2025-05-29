@@ -71,8 +71,13 @@ class Board:
                 regions[region_id].append((r, c))
 
         return Board(grid, dict(regions))  # converte defaultdict em dict normal
-
+    
+    def print_instance(self):
+        """Imprime o tabuleiro no formato especificado: uma linha por linha, valores separados por tabulação."""
+        for row in self.grid:
+            print('\t'.join(str(cell) for cell in row))
     # TODO: outros metodos da classe Board
+    
 
 class Nuruomino(Problem):
     def __init__(self, board: Board):
@@ -119,3 +124,5 @@ class Nuruomino(Problem):
         print("\nRegiões:")
         for rid, cells in board.regions.items():
             print(f"Região {rid}: {cells}")
+
+        board.print_instance()
