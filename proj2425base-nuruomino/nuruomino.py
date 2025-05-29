@@ -11,6 +11,8 @@ import sys
 from collections import defaultdict
 from utils import *
 import numpy as np
+import copy
+
 
 class NuruominoState:
     state_id = 0
@@ -24,6 +26,8 @@ class NuruominoState:
         """ Este método é utilizado em caso de empate na gestão da lista
         de abertos nas procuras informadas. """
         return self.id < other.id
+
+
 
 class Board:
     """Representação interna de um tabuleiro do Puzzle Nuruomino."""
@@ -99,8 +103,41 @@ class Board:
         for row in self.grid:
             print('\t'.join(str(cell) for cell in row))
     # TODO: outros metodos da classe Board
-    
 
+    def place_piece(self, region_id, symbol, shape):
+        """
+        Coloca a peça (shape) na primeira posição possível da região region_id,
+        preenchendo as células correspondentes com o símbolo dado.
+        shape: matriz de 0/1 (linhas x colunas)
+        symbol: valor a colocar (ex: 'S')
+        region_id: região onde tentar encaixar
+        Retorna um novo Board com a peça colocada (não altera o original).
+        """
+        region_cells = set(self.regions[region_id])
+        #nrows, ncols = len(self.grid), len(self.grid[0])
+        sh_rows, sh_cols = len(shape), len(shape[0])
+        # Tentar todas as posições possíveis dentro da região
+        for (base_r, base_c) in region_cells:
+            fits = True
+            cells_to_fill = []
+            for dr in range(sh_rows):
+                for dc in range(sh_cols):
+                    if shape[dr][dc]:
+                        r, c = base_r + dr, base_c + dc
+                        if (r, c) not in region_cells:
+                            fits = False
+                            break
+                        cells_to_fill.append((r, c))
+                if not fits:
+                    break
+            if fits:
+                new_grid = copy.deepcopy(self.grid)
+                for (r, c) in cells_to_fill:
+                    new_grid[r][c] = symbol
+                return Board(new_grid, self.regions)
+        # Se não couber, retorna None
+        return None
+#-------------------------------------------------------------------------------------------------------------
 class Nuruomino(Problem):
     def __init__(self, board: Board):
         """O construtor especifica o estado inicial."""
@@ -116,14 +153,16 @@ class Nuruomino(Problem):
         pass 
 
     def result(self, state: NuruominoState, action):
-        """Retorna o estado resultante de executar a 'action' sobre
-        'state' passado como argumento. A ação a executar deve ser uma
-        das presentes na lista obtida pela execução de
-        self.actions(state)."""
-
-        #TODO
-        pass 
-        
+        """
+        Executa a ação sobre o estado e retorna um novo estado resultante.
+        action: (region_id, symbol, shape)
+        """
+        region_id, symbol, shape = action
+        new_board = state.board.place_piece(region_id, symbol, shape)
+        if new_board is None:
+            # Se não for possível colocar a peça, retorna o estado original (ou pode lançar exceção)
+            return state
+        return NuruominoState(new_board)
 
     def goal_test(self, state: NuruominoState):
         """Retorna True se e só se o estado passado como argumento é
@@ -145,10 +184,21 @@ class Nuruomino(Problem):
 
 #PRINTS PARA DEBUG
 if __name__ == "__main__":
+    # Ler grelha do figura 1a:
     board = Board.parse_instance()
-    board.print_instance()
+    # Criar uma instância de Nuruomino:
     problem = Nuruomino(board)
     # Criar um estado com a configuração inicial:
     initial_state = NuruominoState(board)
+    # Mostrar valor na posição (1, 0):
+    print(initial_state.board.get_value(1, 0))
+    # Realizar ação de colocar a peça L, cuja forma é [[1, 1],[1, 0],[1, 0]] na região 1
+    result_state = s1 = problem.result(initial_state, (1, 'L', [[1, 1],[1, 0],[1, 0]]))
     # Mostrar valor na posição (2, 1):
-    print(initial_state.board.get_value(2, 1))
+    print(result_state.board.get_value(1, 0))
+    # Mostrar os valores de posições adjacentes
+    print(result_state.board.adjacent_values(1,1))
+
+
+
+    result_state.board.print_instance()
