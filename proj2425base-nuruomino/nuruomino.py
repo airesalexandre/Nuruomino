@@ -34,19 +34,41 @@ class Board:
 
     def adjacent_regions(self, region:int) -> list:
         """Devolve uma lista das regiões que fazem fronteira com a região enviada no argumento."""
-        #TODO
-        pass
-    
+        adj = set()
+        for (row, col) in self.regions[region]:
+            for dr in [-1, 0, 1]:
+                for dc in [-1, 0, 1]:
+                    if dr == 0 and dc == 0:
+                        continue
+                    nr, nc = row + dr, col + dc
+                    if 0 <= nr < len(self.grid) and 0 <= nc < len(self.grid[0]):
+                        reg = self.grid[nr][nc]
+                        if reg != region:
+                            adj.add(reg)
+        return list(adj)
+
     def adjacent_positions(self, row:int, col:int) -> list:
-        """Devolve as posições adjacentes à região, em todas as direções, incluindo diagonais."""
-        #TODO
-        pass
+        """Devolve as posições adjacentes à posição (row, col), em todas as direções, incluindo diagonais."""
+        positions = []
+        for dr in [-1, 0, 1]:
+            for dc in [-1, 0, 1]:
+                if dr == 0 and dc == 0:
+                    continue
+                nr, nc = row + dr, col + dc
+                if 0 <= nr < len(self.grid) and 0 <= nc < len(self.grid[0]):
+                    positions.append((nr, nc))
+        return positions
 
     def adjacent_values(self, row:int, col:int) -> list:
-        """Devolve os valores das celulas adjacentes à região, em todas as direções, incluindo diagonais."""
-        #TODO
-        pass
+        """Devolve os valores das células adjacentes à posição (row, col), em todas as direções, incluindo diagonais."""
+        values = []
+        for (nr, nc) in self.adjacent_positions(row, col):
+            values.append(self.grid[nr][nc])
+        return values
     
+    def get_value(self, row, col):
+        """Retorna o valor preenchido na posição (row, col) do tabuleiro."""
+        return self.grid[row][col]
     
     @staticmethod
     def parse_instance():
@@ -126,3 +148,7 @@ class Nuruomino(Problem):
             print(f"Região {rid}: {cells}")
 
         board.print_instance()
+
+        print(board.adjacent_regions(1))
+        print(board.adjacent_positions(0,0))
+        print(board.adjacent_values(0,0))
