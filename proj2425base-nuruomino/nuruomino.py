@@ -7,6 +7,10 @@
 # 109416 Pedro Veríssimo
 
 from search import Problem, Node
+import sys
+from collections import defaultdict
+from utils import *
+import numpy as np
 
 class NuruominoState:
     state_id = 0
@@ -23,6 +27,10 @@ class NuruominoState:
 
 class Board:
     """Representação interna de um tabuleiro do Puzzle Nuruomino."""
+
+    def __init__(self, grid, regions):
+        self.grid = grid
+        self.regions = regions
 
     def adjacent_regions(self, region:int) -> list:
         """Devolve uma lista das regiões que fazem fronteira com a região enviada no argumento."""
@@ -52,7 +60,17 @@ class Board:
             > line = stdin.readline().split()
         """
         #TODO
-        pass    
+        grid = []
+        regions = defaultdict(list)
+        for r, line in enumerate(sys.stdin):
+            tokens = line.strip().split()
+            row = [int(tok) for tok in tokens]
+            grid.append(row)
+
+            for c, region_id in enumerate(row):
+                regions[region_id].append((r, c))
+
+        return Board(grid, dict(regions))  # converte defaultdict em dict normal
 
     # TODO: outros metodos da classe Board
 
@@ -89,3 +107,15 @@ class Nuruomino(Problem):
         """Função heuristica utilizada para a procura A*."""
         # TODO
         pass
+
+    #PRINTS PARA DEBUG
+    if __name__ == "__main__":
+        board = Board.parse_instance()
+
+        print("Tabuleiro:")
+        for row in board.grid:
+            print(row)
+
+        print("\nRegiões:")
+        for rid, cells in board.regions.items():
+            print(f"Região {rid}: {cells}")
