@@ -131,7 +131,7 @@ class Board:
                 if not fits:
                     break
             if fits:
-                new_grid = copy.deepcopy(self.grid)
+                new_grid = [row[:] for row in self.grid]
                 for (r, c) in cells_to_fill:
                     new_grid[r][c] = symbol
                 return Board(new_grid, self.regions)
@@ -141,16 +141,44 @@ class Board:
 class Nuruomino(Problem):
     def __init__(self, board: Board):
         """O construtor especifica o estado inicial."""
-        #TODO
         self.initial = NuruominoState(board)
         self.board = board
-        pass 
+
+    pieces = [('L', [[1, 1],[1, 0],[1, 0]]),
+                  ('L', [[1, 1],[0, 1],[0, 1]]),
+                  ('L', [[1, 0],[1, 0],[1, 1]]),
+                  ('L', [[0, 1],[0, 1],[1, 1]]),
+                  ('L', [[1, 1, 1],[1, 0, 0]]),
+                  ('L', [[1, 1, 1],[0, 0, 1]]),
+                  ('L', [[1, 0, 0],[1, 1, 1]]),
+                  ('L', [[0, 0, 1],[1, 1, 1]]),
+                  ('S', [[1, 0], [1, 1],[0, 1]]),
+                  ('S', [[0, 1], [1, 1],[1, 0]]),
+                  ('S', [[1, 1, 0], [0, 1, 1]]),
+                  ('S', [[0, 1, 1], [1, 1, 0]]),
+                  ('T', [[1, 0], [1, 1],[1, 0]]),
+                  ('T', [[0, 1], [1, 1],[0, 1]]),
+                  ('T', [[1, 1, 1], [0, 1, 0]]),
+                  ('T', [[0, 1, 0], [1, 1, 1]]),
+                  ('I', [[1],[1],[1],[1]]),
+                  ('I', [[1, 1, 1, 1]]),]
 
     def actions(self, state: NuruominoState):
         """Retorna uma lista de ações que podem ser executadas a
         partir do estado passado como argumento."""
-        #TODO
-        pass 
+        actions = []
+
+        for region_id, cells in state.board.regions.items():
+            # Só tenta regiões que ainda têm células livres (assumindo int como livre)
+            region_free = any(isinstance(state.board.get_value(r, c), int) for (r, c) in cells)
+            if not region_free:
+                continue
+            for symbol, shape in self.pieces:
+                # Só adiciona a ação se for possível colocar a peça nesta região
+                if state.board.place_piece(region_id, symbol, shape) is not None:
+                    actions.append((region_id, symbol, shape))
+        return actions
+
 
     def result(self, state: NuruominoState, action):
         """
@@ -188,17 +216,19 @@ if __name__ == "__main__":
     board = Board.parse_instance()
     # Criar uma instância de Nuruomino:
     problem = Nuruomino(board)
-    # Criar um estado com a configuração inicial:
-    initial_state = NuruominoState(board)
-    # Mostrar valor na posição (1, 0):
-    print(initial_state.board.get_value(1, 0))
-    # Realizar ação de colocar a peça L, cuja forma é [[1, 1],[1, 0],[1, 0]] na região 1
-    result_state = s1 = problem.result(initial_state, (1, 'L', [[1, 1],[1, 0],[1, 0]]))
-    # Mostrar valor na posição (2, 1):
-    print(result_state.board.get_value(1, 0))
-    # Mostrar os valores de posições adjacentes
-    print(result_state.board.adjacent_values(1,1))
+    
+        # Criar um estado com a configuração inicial:
+    s0 = NuruominoState(board)
+    # Aplicar as ações que resolvem a instância
+    s1 = problem.result(s0, (1, 'L', [[1, 1],[1, 0],[1, 0]]))
+    s2 = problem.result(s1, (2, 'S', [[1, 0], [1, 1],[0, 1]]))
+    s3 = problem.result(s2, (3, 'T', [[1, 0],[1, 1],[1, 0]]))
+    s4 = problem.result(s3, (4, 'L', [[1, 1, 1],[1, 0, 0]]))
+    s5 = problem.result(s4, (5, 'I', [[1],[1],[1],[1]]))
 
 
 
-    result_state.board.print_instance()
+    actions = problem.actions(s5)
+    print("Ações possíveis a partir do estado inicial:")
+    for action in actions:
+        print(action)
