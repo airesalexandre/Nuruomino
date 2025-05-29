@@ -105,6 +105,8 @@ class Nuruomino(Problem):
     def __init__(self, board: Board):
         """O construtor especifica o estado inicial."""
         #TODO
+        self.initial = NuruominoState(board)
+        self.board = board
         pass 
 
     def actions(self, state: NuruominoState):
@@ -135,20 +137,18 @@ class Nuruomino(Problem):
         # TODO
         pass
 
-    #PRINTS PARA DEBUG
-    if __name__ == "__main__":
-        board = Board.parse_instance()
 
-        print("Tabuleiro:")
-        for row in board.grid:
-            print(row)
 
-        print("\nRegiões:")
-        for rid, cells in board.regions.items():
-            print(f"Região {rid}: {cells}")
 
-        board.print_instance()
 
-        print(board.adjacent_regions(1))
-        print(board.adjacent_positions(0,0))
-        print(board.adjacent_values(0,0))
+
+
+#PRINTS PARA DEBUG
+if __name__ == "__main__":
+    board = Board.parse_instance()
+    board.print_instance()
+    problem = Nuruomino(board)
+    # Criar um estado com a configuração inicial:
+    initial_state = NuruominoState(board)
+    # Mostrar valor na posição (2, 1):
+    print(initial_state.board.get_value(2, 1))
