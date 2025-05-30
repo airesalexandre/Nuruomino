@@ -112,11 +112,10 @@ class Board:
         symbol: valor a colocar (ex: 'S')
         region_id: região onde tentar encaixar
         Retorna um novo Board com a peça colocada (não altera o original).
+        Só coloca se não ligar a peça a outra da mesma letra e não criar 2x2 com letras.
         """
         region_cells = set(self.regions[region_id])
-        #nrows, ncols = len(self.grid), len(self.grid[0])
         sh_rows, sh_cols = len(shape), len(shape[0])
-        # Tentar todas as posições possíveis dentro da região
         for (base_r, base_c) in region_cells:
             fits = True
             cells_to_fill = []
@@ -127,14 +126,52 @@ class Board:
                         if (r, c) not in region_cells:
                             fits = False
                             break
+                        # Não pode sobrepor símbolo já colocado
+                        if not isinstance(self.grid[r][c], int):
+                            fits = False
+                            break
                         cells_to_fill.append((r, c))
                 if not fits:
                     break
-            if fits:
-                new_grid = [row[:] for row in self.grid]
-                for (r, c) in cells_to_fill:
-                    new_grid[r][c] = symbol
-                return Board(new_grid, self.regions)
+            if not fits:
+                continue
+
+            # Verificar se conecta com outra peça do mesmo símbolo
+            connects_same = False
+            for (r, c) in cells_to_fill:
+                for (nr, nc) in self.adjacent_positions(r, c):
+                    if (nr, nc) not in cells_to_fill:
+                        if self.grid[nr][nc] == symbol:
+                            connects_same = True
+                            break
+                if connects_same:
+                    break
+            if connects_same:
+                continue
+
+            # Verificar se cria bloco 2x2 com letras (em qualquer posição da peça)
+            creates_2x2 = False
+            new_grid = [row[:] for row in self.grid]
+            for (r, c) in cells_to_fill:
+                new_grid[r][c] = symbol
+            for (r, c) in cells_to_fill:
+                for dr in [0, -1]:
+                    for dc in [0, -1]:
+                        rr, cc = r + dr, c + dc
+                        if 0 <= rr < len(new_grid)-1 and 0 <= cc < len(new_grid[0])-1:
+                            block = [new_grid[rr][cc], new_grid[rr+1][cc], new_grid[rr][cc+1], new_grid[rr+1][cc+1]]
+                            if all(isinstance(x, str) for x in block):
+                                creates_2x2 = True
+                                break
+                    if creates_2x2:
+                        break
+                if creates_2x2:
+                    break
+            if creates_2x2:
+                continue
+
+            # Se passou todos os testes, retorna novo Board
+            return Board(new_grid, self.regions)
         # Se não couber, retorna None
         return None
 #-------------------------------------------------------------------------------------------------------------
@@ -224,11 +261,11 @@ if __name__ == "__main__":
     s2 = problem.result(s1, (2, 'S', [[1, 0], [1, 1],[0, 1]]))
     #s3 = problem.result(s2, (3, 'T', [[1, 0],[1, 1],[1, 0]]))
     s4 = problem.result(s2, (4, 'L', [[1, 1, 1],[1, 0, 0]]))
-    s5 = problem.result(s4, (5, 'I', [[1],[1],[1],[1]]))
+    #s5 = problem.result(s4, (5, 'I', [[1],[1],[1],[1]]))
 
     s4.board.print_instance()
 
-    actions = problem.actions(s5)
+    actions = problem.actions(s4)
     print("Ações possíveis a partir do estado inicial:")
     for action in actions:
         print(action)
