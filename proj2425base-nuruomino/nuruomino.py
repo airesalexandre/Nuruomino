@@ -222,11 +222,11 @@ if __name__ == "__main__":
     # Aplicar as ações que resolvem a instância
     s1 = problem.result(s0, (1, 'L', [[1, 1],[1, 0],[1, 0]]))
     s2 = problem.result(s1, (2, 'S', [[1, 0], [1, 1],[0, 1]]))
-    s3 = problem.result(s2, (3, 'T', [[1, 0],[1, 1],[1, 0]]))
-    s4 = problem.result(s3, (4, 'L', [[1, 1, 1],[1, 0, 0]]))
+    #s3 = problem.result(s2, (3, 'T', [[1, 0],[1, 1],[1, 0]]))
+    s4 = problem.result(s2, (4, 'L', [[1, 1, 1],[1, 0, 0]]))
     s5 = problem.result(s4, (5, 'I', [[1],[1],[1],[1]]))
 
-
+    s4.board.print_instance()
 
     actions = problem.actions(s5)
     print("Ações possíveis a partir do estado inicial:")
