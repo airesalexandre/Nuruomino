@@ -102,8 +102,16 @@ class Board:
         """Imprime o tabuleiro no formato especificado: uma linha por linha, valores separados por tabulação."""
         for row in self.grid:
             print('\t'.join(str(cell) for cell in row))
+    
+    def print(self):
+        """Retorna uma string com o tabuleiro no formato especificado: uma linha por linha, valores separados por tabulação."""
+        lines = []
+        for row in self.grid:
+            lines.append('\t'.join(str(cell) for cell in row))
+        return '\n'.join(lines)
     # TODO: outros metodos da classe Board
 
+    
     def place_piece(self, region_id, symbol, shape):
         """
         Coloca a peça (shape) na primeira posição possível da região region_id,
@@ -230,11 +238,44 @@ class Nuruomino(Problem):
         return NuruominoState(new_board)
 
     def goal_test(self, state: NuruominoState):
-        """Retorna True se e só se o estado passado como argumento é
-        um estado objetivo. Deve verificar se todas as posições do tabuleiro
-        estão preenchidas de acordo com as regras do problema."""
-        #TODO
-        pass 
+        """
+        Retorna True se e só se o estado passado como argumento é
+        um estado objetivo. Cada região deve ter 4 letras (uma peça) e
+        cada tetromino deve estar ortogonalmente conectado a pelo menos
+        um tetromino de outra região (não pode haver tetrominos isolados).
+        """
+        board = state.board
+        # Primeiro, verifica se todas as regiões têm exatamente 4 letras
+        for region_id, cells in board.regions.items():
+            region_letters = [(r, c) for (r, c) in cells if isinstance(board.get_value(r, c), str)]
+            if len(region_letters) != 4:
+                return False
+
+        # Agora, verifica se cada tetromino está conectado a pelo menos um de outra região
+        for region_id, cells in board.regions.items():
+            region_letters = [(r, c) for (r, c) in cells if isinstance(board.get_value(r, c), str)]
+            if not region_letters:
+                continue
+            connected_to_other = False
+            for (r, c) in region_letters:
+                for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
+                    nr, nc = r+dr, c+dc
+                    if 0 <= nr < len(board.grid) and 0 <= nc < len(board.grid[0]):
+                        neighbor_val = board.get_value(nr, nc)
+                        # Se for letra e não for da mesma região, está conectado a outro tetromino
+                        if isinstance(neighbor_val, str) and (nr, nc) not in region_letters:
+                            # Descobre a que região pertence o vizinho
+                            for other_region_id, other_cells in board.regions.items():
+                                if other_region_id != region_id and (nr, nc) in other_cells:
+                                    connected_to_other = True
+                                    break
+                        if connected_to_other:
+                            break
+                if connected_to_other:
+                    break
+            if not connected_to_other:
+                return False
+        return True
 
     def h(self, node: Node):
         """Função heuristica utilizada para a procura A*."""
@@ -259,13 +300,11 @@ if __name__ == "__main__":
     # Aplicar as ações que resolvem a instância
     s1 = problem.result(s0, (1, 'L', [[1, 1],[1, 0],[1, 0]]))
     s2 = problem.result(s1, (2, 'S', [[1, 0], [1, 1],[0, 1]]))
-    #s3 = problem.result(s2, (3, 'T', [[1, 0],[1, 1],[1, 0]]))
-    s4 = problem.result(s2, (4, 'L', [[1, 1, 1],[1, 0, 0]]))
-    #s5 = problem.result(s4, (5, 'I', [[1],[1],[1],[1]]))
+    s3 = problem.result(s2, (3, 'T', [[1, 0],[1, 1],[1, 0]]))
+    s4 = problem.result(s3, (4, 'L', [[1, 1, 1],[1, 0, 0]]))
+    s5 = problem.result(s4, (5, 'I', [[1],[1],[1],[1]]))
 
-    s4.board.print_instance()
-
-    actions = problem.actions(s4)
-    print("Ações possíveis a partir do estado inicial:")
-    for action in actions:
-        print(action)
+    print("Is goal?", problem.goal_test(s2))
+    print("Is goal?", problem.goal_test(s5))
+    print("Solution:\n", s5.board.print(), sep="")
+    
