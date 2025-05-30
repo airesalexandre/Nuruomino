@@ -6,7 +6,7 @@
 # 110421 Alexandre Aires
 # 109416 Pedro Veríssimo
 
-from search import Problem, Node
+from search import Problem, Node, depth_first_tree_search, astar_search
 import sys
 from collections import defaultdict
 from utils import *
@@ -112,76 +112,83 @@ class Board:
     # TODO: outros metodos da classe Board
 
     
-    def place_piece(self, region_id, symbol, shape):
+    def find_piece_placements(self, region_id, symbol, shape):
         """
-        Coloca a peça (shape) na primeira posição possível da região region_id,
-        preenchendo as células correspondentes com o símbolo dado.
-        shape: matriz de 0/1 (linhas x colunas)
-        symbol: valor a colocar (ex: 'S')
-        region_id: região onde tentar encaixar
-        Retorna um novo Board com a peça colocada (não altera o original).
-        Só coloca se não ligar a peça a outra da mesma letra e não criar 2x2 com letras.
+        Returns a list of all valid placements for a piece (shape) in the given region.
+        Each placement is a tuple: (region_id, symbol, [(r, c), ...], shape)
+        Allows placement anywhere in the region as long as all cells are in the region and unoccupied.
         """
         region_cells = set(self.regions[region_id])
         sh_rows, sh_cols = len(shape), len(shape[0])
-        for (base_r, base_c) in region_cells:
-            fits = True
-            cells_to_fill = []
-            for dr in range(sh_rows):
-                for dc in range(sh_cols):
-                    if shape[dr][dc]:
-                        r, c = base_r + dr, base_c + dc
-                        if (r, c) not in region_cells:
-                            fits = False
-                            break
-                        # Não pode sobrepor símbolo já colocado
-                        if not isinstance(self.grid[r][c], int):
-                            fits = False
-                            break
-                        cells_to_fill.append((r, c))
-                if not fits:
-                    break
-            if not fits:
-                continue
-
-            # Verificar se conecta com outra peça do mesmo símbolo
-            connects_same = False
-            for (r, c) in cells_to_fill:
-                for (nr, nc) in self.adjacent_positions(r, c):
-                    if (nr, nc) not in cells_to_fill:
-                        if self.grid[nr][nc] == symbol:
-                            connects_same = True
-                            break
-                if connects_same:
-                    break
-            if connects_same:
-                continue
-
-            # Verificar se cria bloco 2x2 com letras (em qualquer posição da peça)
-            creates_2x2 = False
-            new_grid = [row[:] for row in self.grid]
-            for (r, c) in cells_to_fill:
-                new_grid[r][c] = symbol
-            for (r, c) in cells_to_fill:
-                for dr in [0, -1]:
-                    for dc in [0, -1]:
-                        rr, cc = r + dr, c + dc
-                        if 0 <= rr < len(new_grid)-1 and 0 <= cc < len(new_grid[0])-1:
-                            block = [new_grid[rr][cc], new_grid[rr+1][cc], new_grid[rr][cc+1], new_grid[rr+1][cc+1]]
-                            if all(isinstance(x, str) for x in block):
-                                creates_2x2 = True
+        placements = []
+        # Try every possible anchor (top-left) position in the region's bounding box
+        min_r = min(r for r, c in region_cells)
+        max_r = max(r for r, c in region_cells)
+        min_c = min(c for r, c in region_cells)
+        max_c = max(c for r, c in region_cells)
+        for base_r in range(min_r, max_r - sh_rows + 2):
+            for base_c in range(min_c, max_c - sh_cols + 2):
+                fits = True
+                cells_to_fill = []
+                for dr in range(sh_rows):
+                    for dc in range(sh_cols):
+                        if shape[dr][dc]:
+                            r, c = base_r + dr, base_c + dc
+                            if (r, c) not in region_cells:
+                                fits = False
                                 break
+                            if not isinstance(self.grid[r][c], int):
+                                fits = False
+                                break
+                            cells_to_fill.append((r, c))
+                    if not fits:
+                        break
+                if not fits:
+                    continue
+                # Check if connects with same symbol
+                connects_same = False
+                for (r, c) in cells_to_fill:
+                    for (nr, nc) in self.adjacent_positions(r, c):
+                        if (nr, nc) not in cells_to_fill:
+                            if self.grid[nr][nc] == symbol:
+                                connects_same = True
+                                break
+                    if connects_same:
+                        break
+                if connects_same:
+                    continue
+                # Check for 2x2 block with letters
+                creates_2x2 = False
+                new_grid = [row[:] for row in self.grid]
+                for (r, c) in cells_to_fill:
+                    new_grid[r][c] = symbol
+                for (r, c) in cells_to_fill:
+                    for dr in [0, -1]:
+                        for dc in [0, -1]:
+                            rr, cc = r + dr, c + dc
+                            if 0 <= rr < len(new_grid)-1 and 0 <= cc < len(new_grid[0])-1:
+                                block = [new_grid[rr][cc], new_grid[rr+1][cc], new_grid[rr][cc+1], new_grid[rr+1][cc+1]]
+                                if all(isinstance(x, str) for x in block):
+                                    creates_2x2 = True
+                                    break
+                        if creates_2x2:
+                            break
                     if creates_2x2:
                         break
                 if creates_2x2:
-                    break
-            if creates_2x2:
-                continue
+                    continue
+                placements.append((region_id, symbol, cells_to_fill, shape))
+        return placements
 
-            # Se passou todos os testes, retorna novo Board
-            return Board(new_grid, self.regions)
-        # Se não couber, retorna None
-        return None
+    def add_piece(self, symbol, coords):
+        """
+        Returns a new Board with the piece (symbol, shape) placed at the given coordinates (list of (r, c)).
+        Does not check validity, assumes coords is a valid placement.
+        """
+        new_grid = [row[:] for row in self.grid]
+        for (r, c) in coords:
+            new_grid[r][c] = symbol
+        return Board(new_grid, self.regions)
 #-------------------------------------------------------------------------------------------------------------
 class Nuruomino(Problem):
     def __init__(self, board: Board):
@@ -209,76 +216,94 @@ class Nuruomino(Problem):
                   ('I', [[1, 1, 1, 1]]),]
 
     def actions(self, state: NuruominoState):
-        """Retorna uma lista de ações que podem ser executadas a
-        partir do estado passado como argumento."""
+        """Retorna uma lista de ações possíveis a partir do estado."""
         actions = []
-
         for region_id, cells in state.board.regions.items():
-            # Só tenta regiões que ainda têm células livres (assumindo int como livre)
             region_free = any(isinstance(state.board.get_value(r, c), int) for (r, c) in cells)
             if not region_free:
                 continue
             for symbol, shape in self.pieces:
-                # Só adiciona a ação se for possível colocar a peça nesta região
-                if state.board.place_piece(region_id, symbol, shape) is not None:
-                    actions.append((region_id, symbol, shape))
+                placements = state.board.find_piece_placements(region_id, symbol, shape)
+                for (region_id, symbol, coords, shape) in placements:
+                    actions.append((region_id, symbol, coords, shape))
         return actions
 
 
     def result(self, state: NuruominoState, action):
         """
         Executa a ação sobre o estado e retorna um novo estado resultante.
-        action: (region_id, symbol, shape)
+        action: (region_id, symbol, coords, shape)
         """
-        region_id, symbol, shape = action
-        new_board = state.board.place_piece(region_id, symbol, shape)
-        if new_board is None:
-            # Se não for possível colocar a peça, retorna o estado original (ou pode lançar exceção)
-            return state
+        _, symbol, coords, _ = action
+        new_board = state.board.add_piece(symbol, coords)
         return NuruominoState(new_board)
 
     def goal_test(self, state: NuruominoState):
         """
         Retorna True se e só se o estado passado como argumento é
-        um estado objetivo. Cada região deve ter 4 letras (uma peça) e
-        todos os tetrominos devem estar ortogonalmente conectados (formar um único grupo).
+        um estado objetivo. Cada região deve conter exatamente um grupo de 4 células conectadas ortogonalmente com o mesmo símbolo (tetromino),
+        e todos os tetrominos devem estar ortogonalmente conectados (formar um único grupo).
         """
         board = state.board
-
-        # Verifica se todas as regiões têm exatamente 4 letras
+        tetromino_cells = set()
+        # Para cada região, encontrar grupos de 4 células conectadas ortogonalmente com o mesmo símbolo
         for region_id, cells in board.regions.items():
             region_letters = [(r, c) for (r, c) in cells if isinstance(board.get_value(r, c), str)]
-            if len(region_letters) != 4:
+            if len(region_letters) < 4:
                 return False
-
-        # Coleta todas as posições ocupadas por tetrominos
-        all_tetromino_cells = set()
-        for cells in board.regions.values():
-            for (r, c) in cells:
-                if isinstance(board.get_value(r, c), str):
-                    all_tetromino_cells.add((r, c))
-        if not all_tetromino_cells:
+            # Encontrar grupos de células conectadas ortogonalmente com o mesmo símbolo
+            visited = set()
+            found_tetromino = False
+            for (r, c) in region_letters:
+                if (r, c) in visited:
+                    continue
+                symbol = board.get_value(r, c)
+                # BFS para grupo de mesmo símbolo
+                group = set()
+                queue = [(r, c)]
+                while queue:
+                    rr, cc = queue.pop()
+                    if (rr, cc) in group:
+                        continue
+                    if board.get_value(rr, cc) != symbol:
+                        continue
+                    group.add((rr, cc))
+                    for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
+                        nr, nc = rr + dr, cc + dc
+                        if (nr, nc) in region_letters and (nr, nc) not in group:
+                            queue.append((nr, nc))
+                if len(group) == 4:
+                    if found_tetromino:
+                        # Mais de um tetromino na região
+                        return False
+                    found_tetromino = True
+                    tetromino_cells.update(group)
+                    visited.update(group)
+                elif len(group) > 0:
+                    # Grupo inválido (não é tetromino)
+                    visited.update(group)
+            if not found_tetromino:
+                return False
+        # Verificar se todos os tetrominos estão ortogonalmente conectados
+        if not tetromino_cells:
             return False
-
-        # BFS para verificar se todas as células de tetrominos estão conectadas ortogonalmente
         visited = set()
-        queue = [next(iter(all_tetromino_cells))]
+        queue = [next(iter(tetromino_cells))]
         while queue:
             r, c = queue.pop()
             if (r, c) in visited:
                 continue
             visited.add((r, c))
-            # Só ortogonais
             for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
                 nr, nc = r + dr, c + dc
-                if (nr, nc) in all_tetromino_cells and (nr, nc) not in visited:
+                if (nr, nc) in tetromino_cells and (nr, nc) not in visited:
                     queue.append((nr, nc))
-        return visited == all_tetromino_cells
+        return visited == tetromino_cells
 
     def h(self, node: Node):
         """Função heuristica utilizada para a procura A*."""
         # TODO
-        pass
+        return 0
 
 
 
@@ -292,17 +317,9 @@ if __name__ == "__main__":
     board = Board.parse_instance()
     # Criar uma instância de Nuruomino:
     problem = Nuruomino(board)
-    
-        # Criar um estado com a configuração inicial:
-    s0 = NuruominoState(board)
-    # Aplicar as ações que resolvem a instância
-    s1 = problem.result(s0, (1, 'L', [[1, 1],[1, 0],[1, 0]]))
-    s2 = problem.result(s1, (2, 'S', [[1, 0], [1, 1],[0, 1]]))
-    s3 = problem.result(s2, (3, 'T', [[1, 0],[1, 1],[1, 0]]))
-    s4 = problem.result(s3, (4, 'L', [[1, 1, 1],[1, 0, 0]]))
-    s5 = problem.result(s4, (5, 'I', [[1],[1],[1],[1]]))
+    # Obter o nó solução usando a procura em profundidade:
+    goal_node = depth_first_tree_search(problem)
+    # Verificar se foi atingida a solução
+    print("Is goal?", problem.goal_test(goal_node.state))
+    print("Solution:\n", goal_node.state.board.print(), sep="")
 
-    print("Is goal?", problem.goal_test(s2))
-    print("Is goal?", problem.goal_test(s5))
-    print("Solution:\n", s5.board.print(), sep="")
-    
