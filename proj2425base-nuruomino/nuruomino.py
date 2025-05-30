@@ -241,41 +241,39 @@ class Nuruomino(Problem):
         """
         Retorna True se e só se o estado passado como argumento é
         um estado objetivo. Cada região deve ter 4 letras (uma peça) e
-        cada tetromino deve estar ortogonalmente conectado a pelo menos
-        um tetromino de outra região (não pode haver tetrominos isolados).
+        todos os tetrominos devem estar ortogonalmente conectados (formar um único grupo).
         """
         board = state.board
-        # Primeiro, verifica se todas as regiões têm exatamente 4 letras
+
+        # Verifica se todas as regiões têm exatamente 4 letras
         for region_id, cells in board.regions.items():
             region_letters = [(r, c) for (r, c) in cells if isinstance(board.get_value(r, c), str)]
             if len(region_letters) != 4:
                 return False
 
-        # Agora, verifica se cada tetromino está conectado a pelo menos um de outra região
-        for region_id, cells in board.regions.items():
-            region_letters = [(r, c) for (r, c) in cells if isinstance(board.get_value(r, c), str)]
-            if not region_letters:
+        # Coleta todas as posições ocupadas por tetrominos
+        all_tetromino_cells = set()
+        for cells in board.regions.values():
+            for (r, c) in cells:
+                if isinstance(board.get_value(r, c), str):
+                    all_tetromino_cells.add((r, c))
+        if not all_tetromino_cells:
+            return False
+
+        # BFS para verificar se todas as células de tetrominos estão conectadas ortogonalmente
+        visited = set()
+        queue = [next(iter(all_tetromino_cells))]
+        while queue:
+            r, c = queue.pop()
+            if (r, c) in visited:
                 continue
-            connected_to_other = False
-            for (r, c) in region_letters:
-                for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
-                    nr, nc = r+dr, c+dc
-                    if 0 <= nr < len(board.grid) and 0 <= nc < len(board.grid[0]):
-                        neighbor_val = board.get_value(nr, nc)
-                        # Se for letra e não for da mesma região, está conectado a outro tetromino
-                        if isinstance(neighbor_val, str) and (nr, nc) not in region_letters:
-                            # Descobre a que região pertence o vizinho
-                            for other_region_id, other_cells in board.regions.items():
-                                if other_region_id != region_id and (nr, nc) in other_cells:
-                                    connected_to_other = True
-                                    break
-                        if connected_to_other:
-                            break
-                if connected_to_other:
-                    break
-            if not connected_to_other:
-                return False
-        return True
+            visited.add((r, c))
+            # Só ortogonais
+            for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
+                nr, nc = r + dr, c + dc
+                if (nr, nc) in all_tetromino_cells and (nr, nc) not in visited:
+                    queue.append((nr, nc))
+        return visited == all_tetromino_cells
 
     def h(self, node: Node):
         """Função heuristica utilizada para a procura A*."""
