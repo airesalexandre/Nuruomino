@@ -216,9 +216,11 @@ class Nuruomino(Problem):
                   ('I', [[1, 1, 1, 1]]),]
 
     def actions(self, state: NuruominoState):
-        """Retorna uma lista de ações possíveis a partir do estado."""
+        """Retorna uma lista de ações possíveis a partir do estado, priorizando regiões menores."""
+        # Sort regions by size (number of cells), ascending
+        region_order = sorted(state.board.regions.items(), key=lambda item: len(item[1]))
         actions = []
-        for region_id, cells in state.board.regions.items():
+        for region_id, cells in region_order:
             region_free = any(isinstance(state.board.get_value(r, c), int) for (r, c) in cells)
             if not region_free:
                 continue
@@ -226,6 +228,9 @@ class Nuruomino(Problem):
                 placements = state.board.find_piece_placements(region_id, symbol, shape)
                 for (region_id, symbol, coords, shape) in placements:
                     actions.append((region_id, symbol, coords, shape))
+            # Only return actions for the first region with free cells (to force focus)
+            if actions:
+                return actions
         return actions
 
 
@@ -301,9 +306,37 @@ class Nuruomino(Problem):
         return visited == tetromino_cells
 
     def h(self, node: Node):
-        """Função heuristica utilizada para a procura A*."""
-        # TODO
-        return 0
+        board = node.state.board
+        hval = 0
+        for _, cells in board.regions.items():
+            letter_cells = [(r, c) for (r, c) in cells if isinstance(board.get_value(r, c), str)]
+            empty_cells = [(r, c) for (r, c) in cells if isinstance(board.get_value(r, c), int)]
+            # Count number of connected components of letter cells
+            visited = set()
+            components = 0
+            for (r, c) in letter_cells:
+                if (r, c) in visited:
+                    continue
+                components += 1
+                symbol = board.get_value(r, c)
+                queue = [(r, c)]
+                while queue:
+                    rr, cc = queue.pop()
+                    if (rr, cc) in visited:
+                        continue
+                    if board.get_value(rr, cc) != symbol:
+                        continue
+                    visited.add((rr, cc))
+                    for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
+                        nr, nc = rr + dr, cc + dc
+                        if (nr, nc) in letter_cells and (nr, nc) not in visited:
+                            queue.append((nr, nc))
+            # Penalize fragmented regions
+            if components > 1:
+                hval += components
+            # Add number of empty cells divided by 4 (rounded up)
+            hval += (len(empty_cells) + 3) // 4
+        return hval
 
 
 
@@ -318,7 +351,7 @@ if __name__ == "__main__":
     # Criar uma instância de Nuruomino:
     problem = Nuruomino(board)
     # Obter o nó solução usando a procura em profundidade:
-    goal_node = depth_first_tree_search(problem)
+    goal_node = astar_search(problem)
     # Verificar se foi atingida a solução
     print("Is goal?", problem.goal_test(goal_node.state))
     print("Solution:\n", goal_node.state.board.print(), sep="")
