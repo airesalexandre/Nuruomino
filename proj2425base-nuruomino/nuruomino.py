@@ -234,9 +234,38 @@ class Nuruomino(Problem):
             return not has_conflict(board, region, action)
 
         def has_conflict(board, region, action):
-            # Exemplo: verifica se há tetrominos adjacentes iguais ou blocos 2x2
-            # Podes adaptar com partes do teu goal_test
-            return False  # Implementa conforme necessário
+            symbol, coords, shape = action[1], action[2], action[3]
+
+            # 1. Verifica se há tetrominos iguais ortogonalmente adjacentes de regiões diferentes
+            for (r, c) in coords:
+                for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                    nr, nc = r + dr, c + dc
+                    if 0 <= nr < len(board.grid) and 0 <= nc < len(board.grid[0]):
+                        neighbor = board.get_value(nr, nc)
+                        if neighbor == symbol:
+                            # Só é conflito se (r, c) e (nr, nc) forem de regiões diferentes
+                            reg1 = None
+                            reg2 = None
+                            for reg_id, cells in board.regions.items():
+                                if (r, c) in cells:
+                                    reg1 = reg_id
+                                if (nr, nc) in cells:
+                                    reg2 = reg_id
+                            if reg1 is not None and reg2 is not None and reg1 != reg2:
+                                return True
+
+            # 2. Verifica se cria um bloco 2x2 de letras
+            for (r, c) in coords:
+                for dr in [0, -1]:
+                    for dc in [0, -1]:
+                        rr, cc = r + dr, c + dc
+                        if 0 <= rr < len(board.grid)-1 and 0 <= cc < len(board.grid[0])-1:
+                            block = [board.get_value(rr, cc), board.get_value(rr+1, cc),
+                                    board.get_value(rr, cc+1), board.get_value(rr+1, cc+1)]
+                            if all(isinstance(x, str) for x in block):
+                                return True
+
+            return False
 
         def actions_for_region(region, assignment):
             # Gera todas as ações possíveis para a região, dado o assignment parcial
@@ -257,7 +286,16 @@ class Nuruomino(Problem):
 
         def recursive(region_idx):
             if region_idx == len(regions):
-                return assignment  # solução encontrada
+                # Constrói o tabuleiro final
+                board_final = problem.board
+                for reg, act in assignment.items():
+                    board_final = board_final.add_piece(act[1], act[2])
+                final_state = NuruominoState(board_final)
+                # Verifica se é solução global válida (todas as peças conectadas, etc)
+                if problem.goal_test(final_state):
+                    return assignment
+                else:
+                    return None
 
             region = regions[region_idx]
             for action in actions_for_region(region, assignment):
@@ -484,7 +522,6 @@ if __name__ == "__main__":
         for region in sorted(solution):
             _, symbol, coords, _ = solution[region]
             b = b.add_piece(symbol, coords)
-        print("Solução encontrada:")
         print(b.print())
     else:
         print("Nenhuma solução encontrada.")
