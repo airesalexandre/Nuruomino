@@ -6,7 +6,7 @@
 # 110421 Alexandre Aires
 # 109416 Pedro Veríssimo
 
-from search import Problem, Node, depth_first_tree_search, astar_search
+from search import Problem, Node, depth_first_tree_search, astar_search, greedy_search
 import sys
 from collections import defaultdict
 from utils import *
@@ -215,23 +215,122 @@ class Nuruomino(Problem):
                   ('I', [[1],[1],[1],[1]]),
                   ('I', [[1, 1, 1, 1]]),]
 
+    def dfs_backjumping(problem):
+        regions = list(problem.board.regions.keys())
+        assignment = {}
+        conflict_sets = {region: set() for region in regions}
+
+        def is_consistent(region, action, assignment):
+            # Cria um tabuleiro temporário com as peças já colocadas
+            board = problem.board
+            for reg, act in assignment.items():
+                board = board.add_piece(act[1], act[2])
+            # Tenta adicionar a nova peça
+            try:
+                board = board.add_piece(action[1], action[2])
+            except Exception:
+                return False
+            # Verifica restrições locais/globais (podes usar partes do goal_test)
+            return not has_conflict(board, region, action)
+
+        def has_conflict(board, region, action):
+            # Exemplo: verifica se há tetrominos adjacentes iguais ou blocos 2x2
+            # Podes adaptar com partes do teu goal_test
+            return False  # Implementa conforme necessário
+
+        def actions_for_region(region, assignment):
+            # Gera todas as ações possíveis para a região, dado o assignment parcial
+            board = problem.board
+            for reg, act in assignment.items():
+                board = board.add_piece(act[1], act[2])
+            region_actions = []
+            for symbol, shape in problem.pieces:
+                placements = board.find_piece_placements(region, symbol, shape)
+                for (region_id, symbol, coords, shape) in placements:
+                    region_actions.append((region_id, symbol, coords, shape))
+            return region_actions
+
+        def backjump(region):
+            if not conflict_sets[region]:
+                return None
+            return max(conflict_sets[region])
+
+        def recursive(region_idx):
+            if region_idx == len(regions):
+                return assignment  # solução encontrada
+
+            region = regions[region_idx]
+            for action in actions_for_region(region, assignment):
+                if is_consistent(region, action, assignment):
+                    assignment[region] = action
+                    result = recursive(region_idx + 1)
+                    if result is not None:
+                        return result
+                    del assignment[region]
+                else:
+                    for prev_region in assignment:
+                        conflict_sets[region].add(prev_region)
+                    jump_to = backjump(region)
+                    if jump_to is not None:
+                        return None
+            return None
+
+        return recursive(0)
+
     def actions(self, state: NuruominoState):
-        """Retorna uma lista de ações possíveis a partir do estado, priorizando regiões menores."""
-        # Sort regions by size (number of cells), ascending
-        region_order = sorted(state.board.regions.items(), key=lambda item: len(item[1]))
+        """
+        Retorna uma lista de ações possíveis a partir do estado, com limitações e ordenação
+        para acelerar procura em tabuleiros grandes.
+        Cada ação inclui também as coordenadas onde a peça pode ser colocada.
+        """
+        MAX_ACTIONS_PER_REGION = 30  # Evita explosão combinatória
+
+        region_order = sorted(state.board.regions.items(), key=lambda item: len(item[1]))  # Prioriza regiões menores
         actions = []
+
         for region_id, cells in region_order:
             region_free = any(isinstance(state.board.get_value(r, c), int) for (r, c) in cells)
             if not region_free:
                 continue
+
+            region_size = len(cells)
+            if region_size < 4:
+                continue  # Região impossível de preencher
+
+            region_actions = []
+
             for symbol, shape in self.pieces:
+                # Otimização: só tenta peças com <= número de células da região
+                piece_cells = sum(cell for row in shape for cell in row)
+                if piece_cells > region_size:
+                    continue
+
                 placements = state.board.find_piece_placements(region_id, symbol, shape)
+
                 for (region_id, symbol, coords, shape) in placements:
-                    actions.append((region_id, symbol, coords, shape))
-            # Only return actions for the first region with free cells (to force focus)
-            if actions:
-                return actions
+                    # Avaliar qualidade da ação: menos conflitos, mais preenchimento
+                    conflict_score = 0
+                    for (r, c) in coords:
+                        for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                            nr, nc = r + dr, c + dc
+                            if 0 <= nr < len(state.board.grid) and 0 <= nc < len(state.board.grid[0]):
+                                neighbor = state.board.get_value(nr, nc)
+                                if neighbor == symbol:
+                                    conflict_score += 1  # tetromino igual adjacente
+
+                    # Agora a ação inclui as coordenadas onde a peça pode ser colocada
+                    region_actions.append(((region_id, symbol, coords, shape), -len(coords), conflict_score))
+
+            # Ordenar: preferir peças que cobrem mais células e com menos conflitos
+            region_actions.sort(key=lambda x: (x[1], x[2]))
+
+            # Só considera as melhores N ações desta região
+            top_actions = [x[0] for x in region_actions[:MAX_ACTIONS_PER_REGION]]
+            if top_actions:
+                return top_actions  # Só processa a primeira região com ações viáveis
+
         return actions
+
 
 
     def result(self, state: NuruominoState, action):
@@ -305,13 +404,22 @@ class Nuruomino(Problem):
                     queue.append((nr, nc))
         return visited == tetromino_cells
 
+    
+
     def h(self, node: Node):
         board = node.state.board
         hval = 0
+
         for _, cells in board.regions.items():
             letter_cells = [(r, c) for (r, c) in cells if isinstance(board.get_value(r, c), str)]
             empty_cells = [(r, c) for (r, c) in cells if isinstance(board.get_value(r, c), int)]
-            # Count number of connected components of letter cells
+
+            #1. Penalizar regiões com menos de 4 células livres
+            if len(letter_cells) == 0 and len(empty_cells) < 4:
+                hval += 1000  # região impossível de preencher
+                continue
+
+            #2. Penalizar regiões fragmentadas com várias componentes
             visited = set()
             components = 0
             for (r, c) in letter_cells:
@@ -322,21 +430,43 @@ class Nuruomino(Problem):
                 queue = [(r, c)]
                 while queue:
                     rr, cc = queue.pop()
-                    if (rr, cc) in visited:
-                        continue
-                    if board.get_value(rr, cc) != symbol:
+                    if (rr, cc) in visited or board.get_value(rr, cc) != symbol:
                         continue
                     visited.add((rr, cc))
                     for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
                         nr, nc = rr + dr, cc + dc
                         if (nr, nc) in letter_cells and (nr, nc) not in visited:
                             queue.append((nr, nc))
-            # Penalize fragmented regions
             if components > 1:
-                hval += components
-            # Add number of empty cells divided by 4 (rounded up)
+                hval += 5 * (components - 1)
+
+            #3. Penalizar regiões que têm parte de tetrominos mas que não podem mais atingir 4 células
+            if 0 < len(letter_cells) < 4 and len(letter_cells) + len(empty_cells) < 4:
+                hval += 1000  # região já colocada parcialmente, mas sem espaço para completar
+
+            #4. Penalizar tetrominos iguais ortogonalmente adjacentes (mesmo símbolo)
+            for (r, c) in letter_cells:
+                symbol = board.get_value(r, c)
+                for dr, dc in [(-1,0),(1,0),(0,-1),(0,1)]:
+                    nr, nc = r + dr, c + dc
+                    if 0 <= nr < len(board.grid) and 0 <= nc < len(board.grid[0]):
+                        neighbor = board.get_value(nr, nc)
+                        if neighbor == symbol and (nr, nc) not in cells:
+                            hval += 10  # conflito de tetrominos adjacentes
+
+            #5. Estimativa de peças necessárias ainda nesta região
             hval += (len(empty_cells) + 3) // 4
+
+        #6. Penalizar blocos 2x2 de letras (nuricabe inválido)
+        grid = board.grid
+        for r in range(len(grid) - 1):
+            for c in range(len(grid[0]) - 1):
+                block = [grid[r][c], grid[r+1][c], grid[r][c+1], grid[r+1][c+1]]
+                if all(isinstance(x, str) for x in block):
+                    hval += 500  # grande penalização
+
         return hval
+
 
 
 
@@ -346,13 +476,15 @@ class Nuruomino(Problem):
 
 #PRINTS PARA DEBUG
 if __name__ == "__main__":
-    # Ler grelha do figura 1a:
     board = Board.parse_instance()
-    # Criar uma instância de Nuruomino:
     problem = Nuruomino(board)
-    # Obter o nó solução usando a procura em profundidade:
-    goal_node = astar_search(problem)
-    # Verificar se foi atingida a solução
-    print("Is goal?", problem.goal_test(goal_node.state))
-    print("Solution:\n", goal_node.state.board.print(), sep="")
-
+    solution = Nuruomino.dfs_backjumping(problem)
+    if solution:
+        b = board
+        for region in sorted(solution):
+            _, symbol, coords, _ = solution[region]
+            b = b.add_piece(symbol, coords)
+        print("Solução encontrada:")
+        print(b.print())
+    else:
+        print("Nenhuma solução encontrada.")

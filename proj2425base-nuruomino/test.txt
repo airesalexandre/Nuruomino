@@ -1,8 +1,13 @@
-Is goal? True
-Solution:
-L	L	S	2	3	3
-L	2	S	S	3	3
-L	3	3	S	3	I
-3	3	3	T	3	I
-L	L	L	T	T	I
-L	3	3	T	3	I
+Solução encontrada:
+L	L	2	2	I	I	I	I	2	2	L	L
+L	1	2	L	L	4	5	L	L	2	6	L
+L	7	7	L	8	4	5	9	L	6	6	L
+1	7	7	L	8	4	5	T	L	6	6	3
+L	L	7	7	S	S	T	T	6	6	11	I
+L	7	7	S	S	12	12	T	9	L	L	I
+L	7	L	L	7	L	12	6	6	L	6	I
+10	10	L	7	12	L	L	L	6	L	11	I
+13	7	L	7	7	7	6	6	6	6	6	14
+L	13	7	I	I	I	I	15	15	6	L	L
+L	7	7	16	16	16	L	L	L	6	6	L
+L	L	16	16	16	16	L	16	16	16	14	L
