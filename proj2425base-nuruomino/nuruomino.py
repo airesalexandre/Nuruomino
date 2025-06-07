@@ -8,26 +8,6 @@
 
 import sys
 from collections import defaultdict
-import copy
-
-
-def depth_first_search(initial_state, actions_fn, result_fn, goal_test_fn):
-    """Simple DFS using native Python only."""
-    stack = [initial_state]
-    visited = set()
-
-    while stack:
-        state = stack.pop()
-        sid = state.signature()
-        if sid in visited:
-            continue
-        visited.add(sid)
-        if goal_test_fn(state):
-            return state
-        for action in actions_fn(state):
-            child = result_fn(state, action)
-            stack.append(child)
-    return None
 
 
 class NuruominoState:
@@ -124,7 +104,8 @@ class Board:
 
 
 def actions(state):
-    # select first region with no letters placed
+    """ Retorna uma lista de ações que podem ser executadas a
+    partir do estado passado como argumento. """
     for region, cells in state.board.regions.items():
         if all(isinstance(state.board.get_value(r,c), int) for r,c in cells):
             region_id = region
@@ -204,7 +185,7 @@ def smart_backtracking(board, pieces):
 
     def has_conflict(board, region, action):
         symbol, coords, shape = action[1], action[2], action[3]
-        # 1. Tetrominos iguais ortogonalmente adjacentes de regiões diferentes
+        #Verifica se existem tetrominos iguais ortogonalmente adjacentes
         for (r, c) in coords:
             for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                 nr, nc = r + dr, c + dc
@@ -217,7 +198,7 @@ def smart_backtracking(board, pieces):
                             if (nr, nc) in cells: reg2 = reg_id
                         if reg1 is not None and reg2 is not None and reg1 != reg2:
                             return True
-        # 2. Bloco 2x2 de letras
+        # 2.Verifica se se formam regiões 2x2 com tetrominos
         for (r, c) in coords:
             for dr in [0, -1]:
                 for dc in [0, -1]:
@@ -230,7 +211,7 @@ def smart_backtracking(board, pieces):
         return False
 
     def goal_test(board):
-        # Usa o teu goal_test atual, ou adapta conforme necessário
+        """Verifica se o tabuleiro está completo e se todas as regiões estão bem preenchidas"""
         b = board
         all_cells = []
         for region, cells in b.regions.items():
@@ -267,29 +248,25 @@ def smart_backtracking(board, pieces):
         if not region_queue:
             next_min = min(remaining, key=lambda r: len(board.regions[r]))
             region_queue = [next_min]
-        region = select_next_region(board, region_queue, remaining, pieces)
+        region = select_next_region(board, region_queue, pieces)
         region_queue.remove(region)
         remaining = remaining - {region}
         for symbol, shape in pieces:
             for (region_id, symbol, coords, shape) in board.find_piece_placements(region, symbol, shape):
                 new_board = board.add_piece(symbol, coords)
-                #print(f"\n--- Peça '{symbol}' colocada na região {region} ---")
-                #print(new_board.print())
                 if not has_conflict(new_board, region, (region_id, symbol, coords, shape)):
                     new_filled = filled | {region}
                     new_adjacents = get_adjacent_regions(board, [region], remaining)
                     new_queue = region_queue + [r for r in new_adjacents if r not in region_queue]
-                    if forward_check(new_board, new_queue, remaining, pieces):
+                    if forward_check(new_board, new_queue, pieces):
                         result = backtrack(new_board, new_queue, new_filled, remaining)
                         if result is not None:
                             return result
-        #print(f"❌ Nenhuma peça válida para a região {region}. A fazer backtrack...\n")
         return None
-
 
     return backtrack(board, region_queue, filled, remaining)
 
-def select_next_region(board, region_queue, remaining, pieces):
+def select_next_region(board, region_queue, pieces):
     min_actions = float('inf')
     best_region = None
     for region in region_queue:
@@ -301,7 +278,7 @@ def select_next_region(board, region_queue, remaining, pieces):
             best_region = region
     return best_region
 
-def forward_check(board, region_queue, remaining, pieces):
+def forward_check(board, region_queue, pieces):
     for reg in region_queue:
         possible = False
         for symbol, shape in pieces:
@@ -312,11 +289,11 @@ def forward_check(board, region_queue, remaining, pieces):
             return False
     return True
 
+#MAIN
 if __name__ == "__main__":
     board = Board.parse_instance()
     sol_board = smart_backtracking(board, Nuruomino.pieces)
     if sol_board:
-        #print("\n\n\n")
         print(sol_board.print())
     else:
         print("Nenhuma solução encontrada.")
