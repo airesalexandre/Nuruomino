@@ -183,8 +183,8 @@ def smart_backtracking(board, pieces):
                             adj.add(other)
         return list(adj)
 
-    def has_conflict(board, region, action):
-        symbol, coords, shape = action[1], action[2], action[3]
+    def has_conflict(board, action):
+        symbol, coords = action[1], action[2]
         #Verifica se existem tetrominos iguais ortogonalmente adjacentes
         for (r, c) in coords:
             for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
@@ -254,7 +254,7 @@ def smart_backtracking(board, pieces):
         for symbol, shape in pieces:
             for (region_id, symbol, coords, shape) in board.find_piece_placements(region, symbol, shape):
                 new_board = board.add_piece(symbol, coords)
-                if not has_conflict(new_board, region, (region_id, symbol, coords, shape)):
+                if not has_conflict(new_board, (region_id, symbol, coords, shape)):
                     new_filled = filled | {region}
                     new_adjacents = get_adjacent_regions(board, [region], remaining)
                     new_queue = region_queue + [r for r in new_adjacents if r not in region_queue]
